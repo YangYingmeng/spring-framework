@@ -1,19 +1,3 @@
-/*
- * Copyright 2002-2021 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.springframework.beans.factory.support;
 
 import org.springframework.beans.factory.BeanDefinitionStoreException;
@@ -22,104 +6,79 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.lang.Nullable;
 
 /**
- * Simple interface for bean definition readers that specifies load methods with
- * {@link Resource} and {@link String} location parameters.
- *
- * <p>Concrete bean definition readers can of course add additional
- * load and register methods for bean definitions, specific to
- * their bean definition format.
- *
- * <p>Note that a bean definition reader does not have to implement
- * this interface. It only serves as a suggestion for bean definition
- * readers that want to follow standard naming conventions.
- *
- * @author Juergen Hoeller
- * @since 1.1
- * @see org.springframework.core.io.Resource
+ * Bean 定义读取器接口，用于将 Bean 定义从各种资源（如 XML、注解、配置类）中加载到 BeanDefinitionRegistry 中。
+ * <p>主要被 ApplicationContext 和 BeanFactory 在容器初始化时调用，用于构建 IoC 容器中所有的 BeanDefinition。
  */
 public interface BeanDefinitionReader {
 
 	/**
-	 * Return the bean factory to register the bean definitions with.
-	 * <p>The factory is exposed through the {@link BeanDefinitionRegistry} interface,
-	 * encapsulating the methods that are relevant for bean definition handling.
+	 * 获取当前 BeanDefinitionReader 绑定的 BeanDefinitionRegistry。
+	 * <p>所有加载的 BeanDefinition 都将注册到该注册表中。
+	 *
+	 * @return Bean 定义注册器
 	 */
 	BeanDefinitionRegistry getRegistry();
 
 	/**
-	 * Return the {@link ResourceLoader} to use for resource locations.
-	 * <p>Can be checked for the {@code ResourcePatternResolver} interface and cast
-	 * accordingly, for loading multiple resources for a given resource pattern.
-	 * <p>A {@code null} return value suggests that absolute resource loading
-	 * is not available for this bean definition reader.
-	 * <p>This is mainly meant to be used for importing further resources
-	 * from within a bean definition resource, for example via the "import"
-	 * tag in XML bean definitions. It is recommended, however, to apply
-	 * such imports relative to the defining resource; only explicit full
-	 * resource locations will trigger absolute path based resource loading.
-	 * <p>There is also a {@code loadBeanDefinitions(String)} method available,
-	 * for loading bean definitions from a resource location (or location pattern).
-	 * This is a convenience to avoid explicit {@code ResourceLoader} handling.
-	 * @see #loadBeanDefinitions(String)
-	 * @see org.springframework.core.io.support.ResourcePatternResolver
+	 * 获取资源加载器 ResourceLoader，用于加载配置资源（如 XML 文件、注解类等）。
+	 * <p>可能为 null，表示不支持通过路径字符串加载资源。
+	 *
+	 * @return 资源加载器（可为空）
 	 */
 	@Nullable
 	ResourceLoader getResourceLoader();
 
 	/**
-	 * Return the class loader to use for bean classes.
-	 * <p>{@code null} suggests to not load bean classes eagerly
-	 * but rather to just register bean definitions with class names,
-	 * with the corresponding classes to be resolved later (or never).
+	 * 获取用于加载 Bean 类的类加载器。
+	 * <p>通常用于在解析 Bean 定义时实例化类对象，可能为 null。
+	 *
+	 * @return 类加载器（可为空）
 	 */
 	@Nullable
 	ClassLoader getBeanClassLoader();
 
 	/**
-	 * Return the {@link BeanNameGenerator} to use for anonymous beans
-	 * (without explicit bean name specified).
+	 * 获取用于生成 Bean 名称的策略对象。
+	 * <p>当 Bean 未显式指定名称时使用，如配置类中的 @Bean 方法。
+	 *
+	 * @return Bean 名称生成器
 	 */
 	BeanNameGenerator getBeanNameGenerator();
 
-
 	/**
-	 * Load bean definitions from the specified resource.
-	 * @param resource the resource descriptor
-	 * @return the number of bean definitions found
-	 * @throws BeanDefinitionStoreException in case of loading or parsing errors
+	 * 从指定的 Resource 资源中加载并注册 Bean 定义。
+	 *
+	 * @param resource 资源对象（如 XML 文件、properties 文件等）
+	 * @return 加载的 Bean 定义数量
+	 * @throws BeanDefinitionStoreException 加载失败时抛出
 	 */
 	int loadBeanDefinitions(Resource resource) throws BeanDefinitionStoreException;
 
 	/**
-	 * Load bean definitions from the specified resources.
-	 * @param resources the resource descriptors
-	 * @return the number of bean definitions found
-	 * @throws BeanDefinitionStoreException in case of loading or parsing errors
+	 * 从多个 Resource 资源中批量加载并注册 Bean 定义。
+	 *
+	 * @param resources 多个资源对象
+	 * @return 加载的 Bean 定义总数
+	 * @throws BeanDefinitionStoreException 加载失败时抛出
 	 */
 	int loadBeanDefinitions(Resource... resources) throws BeanDefinitionStoreException;
 
 	/**
-	 * Load bean definitions from the specified resource location.
-	 * <p>The location can also be a location pattern, provided that the
-	 * {@link ResourceLoader} of this bean definition reader is a
-	 * {@code ResourcePatternResolver}.
-	 * @param location the resource location, to be loaded with the {@code ResourceLoader}
-	 * (or {@code ResourcePatternResolver}) of this bean definition reader
-	 * @return the number of bean definitions found
-	 * @throws BeanDefinitionStoreException in case of loading or parsing errors
-	 * @see #getResourceLoader()
-	 * @see #loadBeanDefinitions(org.springframework.core.io.Resource)
-	 * @see #loadBeanDefinitions(org.springframework.core.io.Resource[])
+	 * 根据给定的位置（如 classpath 路径、文件系统路径或 URL）加载 Bean 定义。
+	 *
+	 * @param location 资源路径（支持通配符、classpath 前缀等）
+	 * @return 加载的 Bean 定义数量
+	 * @throws BeanDefinitionStoreException 加载失败时抛出
 	 */
 	int loadBeanDefinitions(String location) throws BeanDefinitionStoreException;
 
 	/**
-	 * Load bean definitions from the specified resource locations.
-	 * @param locations the resource locations, to be loaded with the {@code ResourceLoader}
-	 * (or {@code ResourcePatternResolver}) of this bean definition reader
-	 * @return the number of bean definitions found
-	 * @throws BeanDefinitionStoreException in case of loading or parsing errors
+	 * 批量加载多个位置下的 Bean 定义。
+	 *
+	 * @param locations 多个资源路径
+	 * @return 加载的 Bean 定义总数
+	 * @throws BeanDefinitionStoreException 加载失败时抛出
 	 */
 	int loadBeanDefinitions(String... locations) throws BeanDefinitionStoreException;
-
 }
+

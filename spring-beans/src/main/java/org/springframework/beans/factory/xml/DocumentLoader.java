@@ -1,19 +1,3 @@
-/*
- * Copyright 2002-2012 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.springframework.beans.factory.xml;
 
 import org.w3c.dom.Document;
@@ -22,25 +6,20 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
 
 /**
- * Strategy interface for loading an XML {@link Document}.
- *
- * @author Rob Harrop
- * @since 2.0
- * @see DefaultDocumentLoader
+ * 负责加载 XML 文档并返回 org.w3c.dom.Document 对象的接口。
  */
 public interface DocumentLoader {
 
 	/**
-	 * Load a {@link Document document} from the supplied {@link InputSource source}.
-	 * @param inputSource the source of the document that is to be loaded
-	 * @param entityResolver the resolver that is to be used to resolve any entities
-	 * @param errorHandler used to report any errors during document loading
-	 * @param validationMode the type of validation
-	 * {@link org.springframework.util.xml.XmlValidationModeDetector#VALIDATION_DTD DTD}
-	 * or {@link org.springframework.util.xml.XmlValidationModeDetector#VALIDATION_XSD XSD})
-	 * @param namespaceAware {@code true} if support for XML namespaces is to be provided
-	 * @return the loaded {@link Document document}
-	 * @throws Exception if an error occurs
+	 * 解析给定的输入源，加载并返回 XML 文档对象。
+	 *
+	 * @param inputSource    XML 输入源，通常封装了输入流或字符流
+	 * @param entityResolver 用于解析 XML 实体（如 DTD 或外部实体）
+	 * @param errorHandler   解析过程中出现错误时的处理器
+	 * @param validationMode XML 验证模式，决定是否及如何验证 XML（如 DTD 或 XSD）
+	 * @param namespaceAware 是否开启命名空间支持，影响解析时对命名空间的处理
+	 * @return 解析后的 org.w3c.dom.Document 对象，代表整个 XML 文档
+	 * @throws Exception 解析或加载过程中可能抛出的异常
 	 */
 	Document loadDocument(
 			InputSource inputSource, EntityResolver entityResolver,
@@ -48,3 +27,4 @@ public interface DocumentLoader {
 			throws Exception;
 
 }
+

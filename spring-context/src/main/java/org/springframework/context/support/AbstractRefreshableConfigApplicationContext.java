@@ -24,77 +24,63 @@ import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 /**
- * {@link AbstractRefreshableApplicationContext} subclass that adds common handling
- * of specified config locations. Serves as base class for XML-based application
- * context implementations such as {@link ClassPathXmlApplicationContext} and
- * {@link FileSystemXmlApplicationContext}, as well as
- * {@link org.springframework.web.context.support.XmlWebApplicationContext}.
- *
- * @author Juergen Hoeller
- * @since 2.5.2
- * @see #setConfigLocation
- * @see #setConfigLocations
- * @see #getDefaultConfigLocations
+ * 抽象类：可刷新的、可配置的 ApplicationContext 实现类
+ * 提供 configLocation(s) 配置路径的支持
  */
 public abstract class AbstractRefreshableConfigApplicationContext extends AbstractRefreshableApplicationContext
 		implements BeanNameAware, InitializingBean {
 
+	// 保存配置路径（如 classpath:applicationContext.xml 等）
 	@Nullable
 	private String[] configLocations;
 
+	// 标志：是否已显式调用 setId() 方法
 	private boolean setIdCalled = false;
 
+	// ====================
+	// 构造方法
+	// ====================
 
-	/**
-	 * Create a new AbstractRefreshableConfigApplicationContext with no parent.
-	 */
+	// 无参构造器
 	public AbstractRefreshableConfigApplicationContext() {
 	}
 
-	/**
-	 * Create a new AbstractRefreshableConfigApplicationContext with the given parent context.
-	 * @param parent the parent context
-	 */
+	// 允许指定父容器的构造器
 	public AbstractRefreshableConfigApplicationContext(@Nullable ApplicationContext parent) {
 		super(parent);
 	}
 
+	// ====================
+	// 配置路径处理方法
+	// ====================
 
 	/**
-	 * Set the config locations for this application context in init-param style,
-	 * i.e. with distinct locations separated by commas, semicolons or whitespace.
-	 * <p>If not set, the implementation may use a default as appropriate.
+	 * 设置单个配置路径（会自动用 , ; \t \n 等分隔）
+	 * 示例：setConfigLocation("classpath:context1.xml,classpath:context2.xml");
 	 */
 	public void setConfigLocation(String location) {
 		setConfigLocations(StringUtils.tokenizeToStringArray(location, CONFIG_LOCATION_DELIMITERS));
 	}
 
 	/**
-	 * Set the config locations for this application context.
-	 * <p>If not set, the implementation may use a default as appropriate.
+	 * 设置多个配置路径
+	 * 会进行非 null 校验和占位符解析（如 ${user.dir}）
 	 */
 	public void setConfigLocations(@Nullable String... locations) {
 		if (locations != null) {
-			Assert.noNullElements(locations, "Config locations must not be null");
+			Assert.noNullElements(locations, "Config locations must not be null"); // 校验
 			this.configLocations = new String[locations.length];
 			for (int i = 0; i < locations.length; i++) {
+				// 解析占位符并去除空格
 				this.configLocations[i] = resolvePath(locations[i]).trim();
 			}
-		}
-		else {
+		} else {
 			this.configLocations = null;
 		}
 	}
 
 	/**
-	 * Return an array of resource locations, referring to the XML bean definition
-	 * files that this context should be built with. Can also include location
-	 * patterns, which will get resolved via a ResourcePatternResolver.
-	 * <p>The default implementation returns {@code null}. Subclasses can override
-	 * this to provide a set of resource locations to load bean definitions from.
-	 * @return an array of resource locations, or {@code null} if none
-	 * @see #getResources
-	 * @see #getResourcePatternResolver
+	 * 获取配置路径数组（优先使用显式设置的路径，否则调用默认路径）
 	 */
 	@Nullable
 	protected String[] getConfigLocations() {
@@ -102,12 +88,8 @@ public abstract class AbstractRefreshableConfigApplicationContext extends Abstra
 	}
 
 	/**
-	 * Return the default config locations to use, for the case where no
-	 * explicit config locations have been specified.
-	 * <p>The default implementation returns {@code null},
-	 * requiring explicit config locations.
-	 * @return an array of default config locations, if any
-	 * @see #setConfigLocations
+	 * 获取默认配置路径（一般由子类实现）
+	 * 本类默认返回 null
 	 */
 	@Nullable
 	protected String[] getDefaultConfigLocations() {
@@ -115,17 +97,19 @@ public abstract class AbstractRefreshableConfigApplicationContext extends Abstra
 	}
 
 	/**
-	 * Resolve the given path, replacing placeholders with corresponding
-	 * environment property values if necessary. Applied to config locations.
-	 * @param path the original file path
-	 * @return the resolved file path
-	 * @see org.springframework.core.env.Environment#resolveRequiredPlaceholders(String)
+	 * 占位符路径解析方法，如解析 ${user.dir}/app.xml
 	 */
 	protected String resolvePath(String path) {
 		return getEnvironment().resolveRequiredPlaceholders(path);
 	}
 
+	// ====================
+	// BeanNameAware 和 InitializingBean 接口实现
+	// ====================
 
+	/**
+	 * 设置 ApplicationContext 的唯一 ID
+	 */
 	@Override
 	public void setId(String id) {
 		super.setId(id);
@@ -133,26 +117,27 @@ public abstract class AbstractRefreshableConfigApplicationContext extends Abstra
 	}
 
 	/**
-	 * Sets the id of this context to the bean name by default,
-	 * for cases where the context instance is itself defined as a bean.
+	 * 实现 BeanNameAware 接口：当容器启动时注入 Bean 的名字
+	 * 如果用户没有调用 setId()，则默认使用 Bean 名称作为 id
 	 */
 	@Override
 	public void setBeanName(String name) {
 		if (!this.setIdCalled) {
-			super.setId(name);
-			setDisplayName("ApplicationContext '" + name + "'");
+			super.setId(name); // 设置 ID
+			setDisplayName("ApplicationContext '" + name + "'"); // 设置显示名
 		}
 	}
 
 	/**
-	 * Triggers {@link #refresh()} if not refreshed in the concrete context's
-	 * constructor already.
+	 * 实现 InitializingBean 接口：在属性注入完毕后执行
+	 * 如果当前容器还未激活（未刷新），则自动刷新一次
 	 */
 	@Override
 	public void afterPropertiesSet() {
 		if (!isActive()) {
-			refresh();
+			refresh(); // 自动触发容器刷新
 		}
 	}
+
 
 }

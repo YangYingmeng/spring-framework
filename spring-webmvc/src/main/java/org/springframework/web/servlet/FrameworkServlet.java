@@ -272,7 +272,7 @@ public abstract class FrameworkServlet extends HttpServletBean implements Applic
 						cwac.setParent(rootContext);
 					}
 
-					// 配置并刷新当前 WebApplicationContext
+					// 配置并刷新当前 WebApplicationContext, IOC容器初始化
 					configureAndRefreshWebApplicationContext(cwac);
 				}
 			}
@@ -366,6 +366,7 @@ public abstract class FrameworkServlet extends HttpServletBean implements Applic
 
 		postProcessWebApplicationContext(wac);
 		applyInitializers(wac);
+		// 真正开始初始化IOC容器
 		wac.refresh();
 	}
 
