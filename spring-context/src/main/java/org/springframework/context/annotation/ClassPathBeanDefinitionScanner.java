@@ -1,19 +1,3 @@
-/*
- * Copyright 2002-2023 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.springframework.context.annotation;
 
 import java.util.LinkedHashSet;
@@ -36,259 +20,168 @@ import org.springframework.util.Assert;
 import org.springframework.util.PatternMatchUtils;
 
 /**
- * A bean definition scanner that detects bean candidates on the classpath,
- * registering corresponding bean definitions with a given registry ({@code BeanFactory}
- * or {@code ApplicationContext}).
- *
- * <p>Candidate classes are detected through configurable type filters. The
- * default filters include classes that are annotated with Spring's
- * {@link org.springframework.stereotype.Component @Component},
- * {@link org.springframework.stereotype.Repository @Repository},
- * {@link org.springframework.stereotype.Service @Service}, or
- * {@link org.springframework.stereotype.Controller @Controller} stereotype.
- *
- * <p>Also supports Java EE 6's {@link javax.annotation.ManagedBean} and
- * JSR-330's {@link javax.inject.Named} annotations, if available.
- *
- * @author Mark Fisher
- * @author Juergen Hoeller
- * @author Chris Beams
- * @since 2.5
- * @see AnnotationConfigApplicationContext#scan
- * @see org.springframework.stereotype.Component
- * @see org.springframework.stereotype.Repository
- * @see org.springframework.stereotype.Service
- * @see org.springframework.stereotype.Controller
+ * ClassPathBeanDefinitionScanner 用于扫描指定包路径下的类，并将符合条件的类注册为 Spring 容器中的 Bean。
+ * 它是 Spring 注解驱动配置机制的核心组成部分。
  */
 public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateComponentProvider {
 
+	// 用于注册 BeanDefinition 的注册器（一般为 BeanFactory 或 ApplicationContext）
 	private final BeanDefinitionRegistry registry;
 
+	// 默认的 BeanDefinition 属性配置，例如是否懒加载、自动注入模式等
 	private BeanDefinitionDefaults beanDefinitionDefaults = new BeanDefinitionDefaults();
 
+	// 指定自动注入候选的匹配模式（可用于限制哪些 Bean 参与自动注入）
 	@Nullable
 	private String[] autowireCandidatePatterns;
 
+	// Bean 名称生成策略（默认使用 AnnotationBeanNameGenerator）
 	private BeanNameGenerator beanNameGenerator = AnnotationBeanNameGenerator.INSTANCE;
 
+	// Bean 的作用域解析器（如 singleton、prototype、request 等）
 	private ScopeMetadataResolver scopeMetadataResolver = new AnnotationScopeMetadataResolver();
 
+	// 是否注册 @Configuration、@Autowired 等注解处理器
 	private boolean includeAnnotationConfig = true;
 
 
-	/**
-	 * Create a new {@code ClassPathBeanDefinitionScanner} for the given bean factory.
-	 * @param registry the {@code BeanFactory} to load bean definitions into, in the form
-	 * of a {@code BeanDefinitionRegistry}
-	 */
+	// 构造器：默认启用默认过滤器（即扫描 @Component、@Service 等注解）
 	public ClassPathBeanDefinitionScanner(BeanDefinitionRegistry registry) {
 		this(registry, true);
 	}
 
-	/**
-	 * Create a new {@code ClassPathBeanDefinitionScanner} for the given bean factory.
-	 * <p>If the passed-in bean factory does not only implement the
-	 * {@code BeanDefinitionRegistry} interface but also the {@code ResourceLoader}
-	 * interface, it will be used as default {@code ResourceLoader} as well. This will
-	 * usually be the case for {@link org.springframework.context.ApplicationContext}
-	 * implementations.
-	 * <p>If given a plain {@code BeanDefinitionRegistry}, the default {@code ResourceLoader}
-	 * will be a {@link org.springframework.core.io.support.PathMatchingResourcePatternResolver}.
-	 * <p>If the passed-in bean factory also implements {@link EnvironmentCapable} its
-	 * environment will be used by this reader.  Otherwise, the reader will initialize and
-	 * use a {@link org.springframework.core.env.StandardEnvironment}. All
-	 * {@code ApplicationContext} implementations are {@code EnvironmentCapable}, while
-	 * normal {@code BeanFactory} implementations are not.
-	 * @param registry the {@code BeanFactory} to load bean definitions into, in the form
-	 * of a {@code BeanDefinitionRegistry}
-	 * @param useDefaultFilters whether to include the default filters for the
-	 * {@link org.springframework.stereotype.Component @Component},
-	 * {@link org.springframework.stereotype.Repository @Repository},
-	 * {@link org.springframework.stereotype.Service @Service}, and
-	 * {@link org.springframework.stereotype.Controller @Controller} stereotype annotations
-	 * @see #setResourceLoader
-	 * @see #setEnvironment
-	 */
+	// 构造器：可指定是否启用默认过滤器
 	public ClassPathBeanDefinitionScanner(BeanDefinitionRegistry registry, boolean useDefaultFilters) {
 		this(registry, useDefaultFilters, getOrCreateEnvironment(registry));
 	}
 
-	/**
-	 * Create a new {@code ClassPathBeanDefinitionScanner} for the given bean factory and
-	 * using the given {@link Environment} when evaluating bean definition profile metadata.
-	 * <p>If the passed-in bean factory does not only implement the {@code
-	 * BeanDefinitionRegistry} interface but also the {@link ResourceLoader} interface, it
-	 * will be used as default {@code ResourceLoader} as well. This will usually be the
-	 * case for {@link org.springframework.context.ApplicationContext} implementations.
-	 * <p>If given a plain {@code BeanDefinitionRegistry}, the default {@code ResourceLoader}
-	 * will be a {@link org.springframework.core.io.support.PathMatchingResourcePatternResolver}.
-	 * @param registry the {@code BeanFactory} to load bean definitions into, in the form
-	 * of a {@code BeanDefinitionRegistry}
-	 * @param useDefaultFilters whether to include the default filters for the
-	 * {@link org.springframework.stereotype.Component @Component},
-	 * {@link org.springframework.stereotype.Repository @Repository},
-	 * {@link org.springframework.stereotype.Service @Service}, and
-	 * {@link org.springframework.stereotype.Controller @Controller} stereotype annotations
-	 * @param environment the Spring {@link Environment} to use when evaluating bean
-	 * definition profile metadata
-	 * @since 3.1
-	 * @see #setResourceLoader
-	 */
+	// 构造器：可自定义 Environment（用于支持 @Profile、@Value 等）
 	public ClassPathBeanDefinitionScanner(BeanDefinitionRegistry registry, boolean useDefaultFilters,
-			Environment environment) {
+										  Environment environment) {
 
 		this(registry, useDefaultFilters, environment,
 				(registry instanceof ResourceLoader ? (ResourceLoader) registry : null));
 	}
 
-	/**
-	 * Create a new {@code ClassPathBeanDefinitionScanner} for the given bean factory and
-	 * using the given {@link Environment} when evaluating bean definition profile metadata.
-	 * @param registry the {@code BeanFactory} to load bean definitions into, in the form
-	 * of a {@code BeanDefinitionRegistry}
-	 * @param useDefaultFilters whether to include the default filters for the
-	 * {@link org.springframework.stereotype.Component @Component},
-	 * {@link org.springframework.stereotype.Repository @Repository},
-	 * {@link org.springframework.stereotype.Service @Service}, and
-	 * {@link org.springframework.stereotype.Controller @Controller} stereotype annotations
-	 * @param environment the Spring {@link Environment} to use when evaluating bean
-	 * definition profile metadata
-	 * @param resourceLoader the {@link ResourceLoader} to use
-	 * @since 4.3.6
-	 */
+	// 构造器：自定义过滤器、环境变量、资源加载器
 	public ClassPathBeanDefinitionScanner(BeanDefinitionRegistry registry, boolean useDefaultFilters,
-			Environment environment, @Nullable ResourceLoader resourceLoader) {
+										  Environment environment, @Nullable ResourceLoader resourceLoader) {
 
 		Assert.notNull(registry, "BeanDefinitionRegistry must not be null");
 		this.registry = registry;
 
 		if (useDefaultFilters) {
-			registerDefaultFilters();
+			registerDefaultFilters(); // 注册默认过滤器（例如 @Component）
 		}
 		setEnvironment(environment);
 		setResourceLoader(resourceLoader);
 	}
 
-
-	/**
-	 * Return the BeanDefinitionRegistry that this scanner operates on.
-	 */
+	// 获取 BeanDefinition 注册器
 	@Override
 	public final BeanDefinitionRegistry getRegistry() {
 		return this.registry;
 	}
 
-	/**
-	 * Set the defaults to use for detected beans.
-	 * @see BeanDefinitionDefaults
-	 */
+	// 设置默认的 BeanDefinition 属性
 	public void setBeanDefinitionDefaults(@Nullable BeanDefinitionDefaults beanDefinitionDefaults) {
 		this.beanDefinitionDefaults =
 				(beanDefinitionDefaults != null ? beanDefinitionDefaults : new BeanDefinitionDefaults());
 	}
 
-	/**
-	 * Return the defaults to use for detected beans (never {@code null}).
-	 * @since 4.1
-	 */
 	public BeanDefinitionDefaults getBeanDefinitionDefaults() {
 		return this.beanDefinitionDefaults;
 	}
 
-	/**
-	 * Set the name-matching patterns for determining autowire candidates.
-	 * @param autowireCandidatePatterns the patterns to match against
-	 */
+	// 设置自动注入候选的匹配模式（支持通配符）
 	public void setAutowireCandidatePatterns(@Nullable String... autowireCandidatePatterns) {
 		this.autowireCandidatePatterns = autowireCandidatePatterns;
 	}
 
-	/**
-	 * Set the BeanNameGenerator to use for detected bean classes.
-	 * <p>Default is a {@link AnnotationBeanNameGenerator}.
-	 */
+	// 设置 Bean 名称生成器
 	public void setBeanNameGenerator(@Nullable BeanNameGenerator beanNameGenerator) {
 		this.beanNameGenerator =
 				(beanNameGenerator != null ? beanNameGenerator : AnnotationBeanNameGenerator.INSTANCE);
 	}
 
-	/**
-	 * Set the ScopeMetadataResolver to use for detected bean classes.
-	 * Note that this will override any custom "scopedProxyMode" setting.
-	 * <p>The default is an {@link AnnotationScopeMetadataResolver}.
-	 * @see #setScopedProxyMode
-	 */
+	// 设置作用域解析器
 	public void setScopeMetadataResolver(@Nullable ScopeMetadataResolver scopeMetadataResolver) {
 		this.scopeMetadataResolver =
 				(scopeMetadataResolver != null ? scopeMetadataResolver : new AnnotationScopeMetadataResolver());
 	}
 
-	/**
-	 * Specify the proxy behavior for non-singleton scoped beans.
-	 * Note that this will override any custom "scopeMetadataResolver" setting.
-	 * <p>The default is {@link ScopedProxyMode#NO}.
-	 * @see #setScopeMetadataResolver
-	 */
+	// 设置作用域代理模式（如代理作用域为 request）
 	public void setScopedProxyMode(ScopedProxyMode scopedProxyMode) {
 		this.scopeMetadataResolver = new AnnotationScopeMetadataResolver(scopedProxyMode);
 	}
 
-	/**
-	 * Specify whether to register annotation config post-processors.
-	 * <p>The default is to register the post-processors. Turn this off
-	 * to be able to ignore the annotations or to process them differently.
-	 */
+	// 设置是否包含注解配置处理器（如 @Autowired、@Value 等处理器）
 	public void setIncludeAnnotationConfig(boolean includeAnnotationConfig) {
 		this.includeAnnotationConfig = includeAnnotationConfig;
 	}
 
-
 	/**
-	 * Perform a scan within the specified base packages.
-	 * @param basePackages the packages to check for annotated classes
-	 * @return number of beans registered
+	 * 扫描指定包路径，并注册为 Bean
+	 * @param basePackages 扫描的基础包
+	 * @return 注册的 Bean 个数
 	 */
 	public int scan(String... basePackages) {
+
+		// 获取容器中已经注册的 Bean 个数
 		int beanCountAtScanStart = this.registry.getBeanDefinitionCount();
-
+		// 启动扫描器扫描给定包
 		doScan(basePackages);
-
-		// Register annotation config processors, if necessary.
+		// 注册注解配置(Annotation config)处理器
 		if (this.includeAnnotationConfig) {
+			// 注册常用注解处理器：AutowiredAnnotationBeanPostProcessor、CommonAnnotationBeanPostProcessor 等
 			AnnotationConfigUtils.registerAnnotationConfigProcessors(this.registry);
 		}
-
+		// 返回注册的Bean 个数
 		return (this.registry.getBeanDefinitionCount() - beanCountAtScanStart);
 	}
 
 	/**
-	 * Perform a scan within the specified base packages,
-	 * returning the registered bean definitions.
-	 * <p>This method does <i>not</i> register an annotation config processor
-	 * but rather leaves this up to the caller.
-	 * @param basePackages the packages to check for annotated classes
-	 * @return set of beans registered if any for tooling registration purposes (never {@code null})
+	 * 核心扫描逻辑：遍历包路径，筛选候选类，生成 BeanDefinition，注册到 Spring 容器
 	 */
 	protected Set<BeanDefinitionHolder> doScan(String... basePackages) {
+
 		Assert.notEmpty(basePackages, "At least one base package must be specified");
+		// 创建一个集合,存放扫描到 Bean 定义的封装类
 		Set<BeanDefinitionHolder> beanDefinitions = new LinkedHashSet<>();
+
 		for (String basePackage : basePackages) {
+			// 找到所有候选组件（符合条件的类）
 			Set<BeanDefinition> candidates = findCandidateComponents(basePackage);
 			for (BeanDefinition candidate : candidates) {
+				// 为 Bean 设置注解配置的作用域
 				ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(candidate);
 				candidate.setScope(scopeMetadata.getScopeName());
+
+				// 生成 Bean 名称
 				String beanName = this.beanNameGenerator.generateBeanName(candidate, this.registry);
+
+				// 如果扫描到的 Bean 不是 Spring 的注解 Bean,则为 Bean 设置默认值,
+				// 设置 Bean 的自动依赖注入装配属性等
 				if (candidate instanceof AbstractBeanDefinition) {
 					postProcessBeanDefinition((AbstractBeanDefinition) candidate, beanName);
 				}
+
+				// 如果扫描到的Bean 是 Spring 的注解 Bean,则处理其通用的Spring 注解
 				if (candidate instanceof AnnotatedBeanDefinition) {
 					AnnotationConfigUtils.processCommonDefinitionAnnotations((AnnotatedBeanDefinition) candidate);
 				}
+
+				// 根据 Bean 名称检查指定的Bean 是否需要在容器中注册,或者在容器中冲突
 				if (checkCandidate(beanName, candidate)) {
+					// 创建 BeanDefinitionHolder（封装了 BeanDefinition 与名称）
 					BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(candidate, beanName);
+
+					// 根据注解中配置的作用域,为 Bean 应用相应的代理模式
 					definitionHolder =
 							AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
+
 					beanDefinitions.add(definitionHolder);
+					// 向容器注册扫描到的 Bean
 					registerBeanDefinition(definitionHolder, this.registry);
 				}
 			}
@@ -296,12 +189,7 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 		return beanDefinitions;
 	}
 
-	/**
-	 * Apply further settings to the given bean definition,
-	 * beyond the contents retrieved from scanning the component class.
-	 * @param beanDefinition the scanned bean definition
-	 * @param beanName the generated bean name for the given bean
-	 */
+	// 应用默认配置和自动注入候选规则
 	protected void postProcessBeanDefinition(AbstractBeanDefinition beanDefinition, String beanName) {
 		beanDefinition.applyDefaults(this.beanDefinitionDefaults);
 		if (this.autowireCandidatePatterns != null) {
@@ -309,29 +197,12 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 		}
 	}
 
-	/**
-	 * Register the specified bean with the given registry.
-	 * <p>Can be overridden in subclasses, e.g. to adapt the registration
-	 * process or to register further bean definitions for each scanned bean.
-	 * @param definitionHolder the bean definition plus bean name for the bean
-	 * @param registry the BeanDefinitionRegistry to register the bean with
-	 */
+	// 注册 BeanDefinition 到注册表
 	protected void registerBeanDefinition(BeanDefinitionHolder definitionHolder, BeanDefinitionRegistry registry) {
 		BeanDefinitionReaderUtils.registerBeanDefinition(definitionHolder, registry);
 	}
 
-
-	/**
-	 * Check the given candidate's bean name, determining whether the corresponding
-	 * bean definition needs to be registered or conflicts with an existing definition.
-	 * @param beanName the suggested name for the bean
-	 * @param beanDefinition the corresponding bean definition
-	 * @return {@code true} if the bean can be registered as-is;
-	 * {@code false} if it should be skipped because there is an
-	 * existing, compatible bean definition for the specified name
-	 * @throws IllegalStateException if an existing, incompatible bean definition
-	 * has been found for the specified name
-	 */
+	// 检查是否为有效的 Bean 候选者（判断是否与已有 Bean 冲突）
 	protected boolean checkCandidate(String beanName, BeanDefinition beanDefinition) throws IllegalStateException {
 		if (!this.registry.containsBeanDefinition(beanName)) {
 			return true;
@@ -349,28 +220,14 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 				"non-compatible bean definition of same name and class [" + existingDef.getBeanClassName() + "]");
 	}
 
-	/**
-	 * Determine whether the given new bean definition is compatible with
-	 * the given existing bean definition.
-	 * <p>The default implementation considers them as compatible when the existing
-	 * bean definition comes from the same source or from a non-scanning source.
-	 * @param newDef the new bean definition, originated from scanning
-	 * @param existingDef the existing bean definition, potentially an
-	 * explicitly defined one or a previously generated one from scanning
-	 * @return whether the definitions are considered as compatible, with the
-	 * new definition to be skipped in favor of the existing definition
-	 */
+	// 判断两个 BeanDefinition 是否兼容
 	protected boolean isCompatible(BeanDefinition newDef, BeanDefinition existingDef) {
-		return (!(existingDef instanceof ScannedGenericBeanDefinition) ||  // explicitly registered overriding bean
-				(newDef.getSource() != null && newDef.getSource().equals(existingDef.getSource())) ||  // scanned same file twice
-				newDef.equals(existingDef));  // scanned equivalent class twice
+		return (!(existingDef instanceof ScannedGenericBeanDefinition) ||
+				(newDef.getSource() != null && newDef.getSource().equals(existingDef.getSource())) ||
+				newDef.equals(existingDef));
 	}
 
-
-	/**
-	 * Get the Environment from the given registry if possible, otherwise return a new
-	 * StandardEnvironment.
-	 */
+	// 获取环境变量对象，如果注册器支持则从中获取，否则新建一个标准环境
 	private static Environment getOrCreateEnvironment(BeanDefinitionRegistry registry) {
 		Assert.notNull(registry, "BeanDefinitionRegistry must not be null");
 		if (registry instanceof EnvironmentCapable) {
@@ -378,5 +235,4 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 		}
 		return new StandardEnvironment();
 	}
-
 }
