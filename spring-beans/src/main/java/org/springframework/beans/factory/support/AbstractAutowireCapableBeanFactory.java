@@ -22,7 +22,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
 import org.apache.commons.logging.Log;
-
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeanWrapperImpl;
@@ -309,27 +308,48 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		return initializeBean(beanName, existingBean, null);
 	}
 
+	/**
+	 * 应用所有注册的 BeanPostProcessor 的 postProcessBeforeInitialization 方法，
+	 * 对指定的 bean 在其初始化方法（如 afterPropertiesSet 或 init-method）调用之前进行处理。
+	 *
+	 * @param existingBean 已经创建并填充好属性的原始 bean 实例
+	 * @param beanName     当前 bean 在容器中的名称
+	 * @return 经过所有 BeanPostProcessor 处理后的 bean 实例
+	 * @throws BeansException 如果后处理器在处理过程中抛出异常
+	 */
 	@Override
 	public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String beanName)
 			throws BeansException {
 
+		// 初始结果为原始 bean
 		Object result = existingBean;
+
+		// 遍历容器为所创建的Bean 添加的所有 BeanPostProcessor 后置处理器
 		for (BeanPostProcessor processor : getBeanPostProcessors()) {
+			// 调用 Bean 实例所有的后置处理中的初始化后处理方法,为Bean 实例对象在初始化之后做一些自定义的处理操作
 			Object current = processor.postProcessBeforeInitialization(result, beanName);
+
+			// 如果当前处理器返回 null，表示跳过后续处理器，直接返回当前处理结果
+			// 注意：这里不会直接返回 null，而是返回上一个非 null 的 result
 			if (current == null) {
 				return result;
 			}
+
 			result = current;
 		}
+
 		return result;
 	}
+
 
 	@Override
 	public Object applyBeanPostProcessorsAfterInitialization(Object existingBean, String beanName)
 			throws BeansException {
 
 		Object result = existingBean;
+		// 遍历容器为所创建的 Bean 添加的所有 BeanPostProcessor 后置处理器
 		for (BeanPostProcessor processor : getBeanPostProcessors()) {
+			// 调用 Bean 实例所有的后置处理中的初始化后处理方法,为Bean 实例对象在初始化之后做一些自定义的处理操作
 			Object current = processor.postProcessAfterInitialization(result, beanName);
 			if (current == null) {
 				return result;
@@ -365,14 +385,14 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 	/**
 	 * 创建指定名称的 Bean 实例，这是 Bean 创建的总入口方法之一。
-	 *
+	 * <p>
 	 * 【方法职责】
 	 * - 根据 BeanDefinition 创建 Bean 的完整生命周期，包括实例化、属性填充、初始化等；
 	 * - 支持 BeanPostProcessor 的 pre-instantiation 处理（例如 AOP 代理）；
 	 *
 	 * @param beanName Bean 名称
-	 * @param mbd Bean 定义（RootBeanDefinition 类型）
-	 * @param args 构造函数参数（用于构造函数注入）
+	 * @param mbd      Bean 定义（RootBeanDefinition 类型）
+	 * @param args     构造函数参数（用于构造函数注入）
 	 * @return 创建好的 Bean 实例
 	 * @throws BeanCreationException 如果创建失败则抛出异常
 	 */
@@ -434,7 +454,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 	/**
 	 * 具体创建 Bean 实例的过程，执行实例化、属性填充、初始化等完整生命周期操作。
-	 *
+	 * <p>
 	 * 核心流程：
 	 * 1. 尝试从缓存中获取已有的 BeanWrapper，否则创建新的 Bean 实例。
 	 * 2. 缓存并记录 Bean 的类型信息。
@@ -447,8 +467,8 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 	 * 9. 返回最终的 Bean 实例（可能是代理后的对象）。
 	 *
 	 * @param beanName Bean 名称
-	 * @param mbd Bean 定义
-	 * @param args 构造器参数
+	 * @param mbd      Bean 定义
+	 * @param args     构造器参数
 	 * @return 创建好的 Bean 实例（可能是代理对象）
 	 */
 	protected Object doCreateBean(String beanName, RootBeanDefinition mbd, @Nullable Object[] args)
@@ -899,7 +919,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 	/**
 	 * 创建 Bean 实例的具体实现，根据不同情况选择合适的实例化策略。
-	 *
+	 * <p>
 	 * 主要流程：
 	 * 1. 解析 Bean 的 Class 类型，检查访问权限（必须是 public 或允许非 public 访问）。
 	 * 2. 优先通过自定义的实例化 Supplier（工厂函数）获取 Bean 实例。
@@ -910,8 +930,8 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 	 * 7. 最后，默认调用无参构造器实例化 Bean。
 	 *
 	 * @param beanName Bean 名称
-	 * @param mbd Bean 定义
-	 * @param args 构造函数参数（可空）
+	 * @param mbd      Bean 定义
+	 * @param args     构造函数参数（可空）
 	 * @return 包装了实例化好的 Bean 对象的 BeanWrapper
 	 * @throws BeanCreationException 实例化失败时抛出
 	 */
@@ -1380,34 +1400,56 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 	}
 
 
+	/**
+	 * 初始化指定的 bean，包括执行 Aware 接口方法、初始化方法以及 BeanPostProcessor 的前后处理方法。
+	 *
+	 * @param beanName bean 的名称
+	 * @param bean     已实例化并完成依赖注入的 bean 对象
+	 * @param mbd      bean 对应的 RootBeanDefinition，可能为 null
+	 * @return 初始化后的 bean（可能已被代理包装）
+	 */
 	protected Object initializeBean(String beanName, Object bean, @Nullable RootBeanDefinition mbd) {
+
+		// 如果启用了 Java 安全管理器，则在特权访问控制下调用 Aware 方法
 		if (System.getSecurityManager() != null) {
 			AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
+				// 调用 Aware 接口（如 BeanNameAware、BeanClassLoaderAware、BeanFactoryAware）相关方法
 				invokeAwareMethods(beanName, bean);
 				return null;
 			}, getAccessControlContext());
 		} else {
+			// 为 Bean实例对象包装相关属性,如名称,类加载器,所属容器等信息
 			invokeAwareMethods(beanName, bean);
 		}
 
+		// 包装后的 bean（可能被代理）
 		Object wrappedBean = bean;
+
+		// 如果该 bean 不是“合成的”（synthetic，表示由 Spring 内部生成，而不是用户定义的），
+		// 则调用所有 BeanPostProcessor 的 postProcessBeforeInitialization 方法
 		if (mbd == null || !mbd.isSynthetic()) {
 			wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);
 		}
 
 		try {
+			// 调用初始化方法（包括 InitializingBean.afterPropertiesSet() 和 自定义 init-method）
 			invokeInitMethods(beanName, wrappedBean, mbd);
 		} catch (Throwable ex) {
+			// 初始化方法调用失败，抛出 Bean 创建异常
 			throw new BeanCreationException(
 					(mbd != null ? mbd.getResourceDescription() : null),
 					beanName, "Invocation of init method failed", ex);
 		}
+
+		// 如果该 bean 不是“合成的”，则调用所有 BeanPostProcessor 的 postProcessAfterInitialization 方法
 		if (mbd == null || !mbd.isSynthetic()) {
 			wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
 		}
 
+		// 返回最终初始化完成的 bean，可能是原始对象，也可能是代理对象(增强逻辑)
 		return wrappedBean;
 	}
+
 
 	private void invokeAwareMethods(String beanName, Object bean) {
 		if (bean instanceof Aware) {

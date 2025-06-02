@@ -1,55 +1,19 @@
-/*
- * Copyright 2002-2012 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.springframework.aop.framework;
 
 /**
- * Interface to be implemented by factories that are able to create
- * AOP proxies based on {@link AdvisedSupport} configuration objects.
- *
- * <p>Proxies should observe the following contract:
- * <ul>
- * <li>They should implement all interfaces that the configuration
- * indicates should be proxied.
- * <li>They should implement the {@link Advised} interface.
- * <li>They should implement the equals method to compare proxied
- * interfaces, advice, and target.
- * <li>They should be serializable if all advisors and target
- * are serializable.
- * <li>They should be thread-safe if advisors and target
- * are thread-safe.
- * </ul>
- *
- * <p>Proxies may or may not allow advice changes to be made.
- * If they do not permit advice changes (for example, because
- * the configuration was frozen) a proxy should throw an
- * {@link AopConfigException} on an attempted advice change.
- *
- * @author Rod Johnson
- * @author Juergen Hoeller
+ * AopProxyFactory 接口：AOP 代理工厂，用于根据配置信息创建对应的 AopProxy 实例。
+ * 不同的实现类可以选择使用 JDK 动态代理或 CGLIB 来创建代理。
  */
 public interface AopProxyFactory {
 
 	/**
-	 * Create an {@link AopProxy} for the given AOP configuration.
-	 * @param config the AOP configuration in the form of an
-	 * AdvisedSupport object
-	 * @return the corresponding AOP proxy
-	 * @throws AopConfigException if the configuration is invalid
+	 * 根据提供的 AOP 配置信息（AdvisedSupport）创建 AopProxy 对象。
+	 *
+	 * @param config AOP 代理的配置信息，包含目标对象、拦截器链、是否需要代理接口等信息
+	 * @return 创建好的 AopProxy 实例（实际代理对象由 AopProxy.getProxy() 返回）
+	 * @throws AopConfigException 如果配置信息无效或创建代理失败，抛出该异常
 	 */
 	AopProxy createAopProxy(AdvisedSupport config) throws AopConfigException;
 
 }
+
