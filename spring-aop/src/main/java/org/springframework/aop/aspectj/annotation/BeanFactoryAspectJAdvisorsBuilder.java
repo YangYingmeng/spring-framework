@@ -82,10 +82,12 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 	 * Look for AspectJ-annotated aspect beans in the current bean factory,
 	 * and return to a list of Spring AOP Advisors representing them.
 	 * <p>Creates a Spring Advisor for each AspectJ advice method.
+	 *
 	 * @return the list of {@link org.springframework.aop.Advisor} beans
 	 * @see #isEligibleBean
 	 */
 	public List<Advisor> buildAspectJAdvisors() {
+		// 获取已经缓存的切面 Bean 名称
 		List<String> aspectNames = this.aspectBeanNames;
 
 		if (aspectNames == null) {
@@ -94,75 +96,82 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 				if (aspectNames == null) {
 					List<Advisor> advisors = new ArrayList<>();
 					aspectNames = new ArrayList<>();
+
+					// 1. 扫描容器中所有 Bean
 					String[] beanNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
 							this.beanFactory, Object.class, true, false);
+
 					for (String beanName : beanNames) {
-						if (!isEligibleBean(beanName)) {
-							continue;
-						}
-						// We must be careful not to instantiate beans eagerly as in this case they
-						// would be cached by the Spring container but would not have been weaved.
+						// 2. 判断 Bean 是否符合切面资格
+						if (!isEligibleBean(beanName)) continue;
+
+						// 3. 获取 Bean 类型
 						Class<?> beanType = this.beanFactory.getType(beanName, false);
-						if (beanType == null) {
-							continue;
-						}
+						if (beanType == null) continue;
+
+						// 4. 判断 Bean 是否标注 @Aspect
 						if (this.advisorFactory.isAspect(beanType)) {
 							try {
 								AspectMetadata amd = new AspectMetadata(beanType, beanName);
+
+								// 5. 根据切面实例化模型创建 Advisor
 								if (amd.getAjType().getPerClause().getKind() == PerClauseKind.SINGLETON) {
 									MetadataAwareAspectInstanceFactory factory =
 											new BeanFactoryAspectInstanceFactory(this.beanFactory, beanName);
 									List<Advisor> classAdvisors = this.advisorFactory.getAdvisors(factory);
+									// 6. 缓存 Advisor
 									if (this.beanFactory.isSingleton(beanName)) {
 										this.advisorsCache.put(beanName, classAdvisors);
-									}
-									else {
+									} else {
 										this.aspectFactoryCache.put(beanName, factory);
 									}
 									advisors.addAll(classAdvisors);
-								}
-								else {
-									// Per target or per this.
+								} else {
+									// 针对 perthis / pertarget 模型
 									if (this.beanFactory.isSingleton(beanName)) {
-										throw new IllegalArgumentException("Bean with name '" + beanName +
-												"' is a singleton, but aspect instantiation model is not singleton");
+										throw new IllegalArgumentException("单例 Bean 不能使用 perthis / pertarget 切面");
 									}
 									MetadataAwareAspectInstanceFactory factory =
 											new PrototypeAspectInstanceFactory(this.beanFactory, beanName);
 									this.aspectFactoryCache.put(beanName, factory);
 									advisors.addAll(this.advisorFactory.getAdvisors(factory));
 								}
+								// 7. 缓存切面 Bean 名称
 								aspectNames.add(beanName);
-							}
-							catch (IllegalArgumentException | IllegalStateException | AopConfigException ex) {
+							} catch (IllegalArgumentException | IllegalStateException | AopConfigException ex) {
+								// 忽略不兼容的切面
 								if (logger.isDebugEnabled()) {
-									logger.debug("Ignoring incompatible aspect [" + beanType.getName() + "]: " + ex);
+									logger.debug("忽略不兼容切面 [" + beanType.getName() + "]: " + ex);
 								}
 							}
 						}
 					}
+
+					// 8. 保存切面 Bean 名称缓存
 					this.aspectBeanNames = aspectNames;
 					return advisors;
 				}
 			}
 		}
 
+		// 9. 如果已缓存切面 Bean，则直接读取缓存的 Advisors
 		if (aspectNames.isEmpty()) {
 			return Collections.emptyList();
 		}
+
 		List<Advisor> advisors = new ArrayList<>();
 		for (String aspectName : aspectNames) {
 			List<Advisor> cachedAdvisors = this.advisorsCache.get(aspectName);
 			if (cachedAdvisors != null) {
 				advisors.addAll(cachedAdvisors);
-			}
-			else {
+			} else {
 				MetadataAwareAspectInstanceFactory factory = this.aspectFactoryCache.get(aspectName);
 				advisors.addAll(this.advisorFactory.getAdvisors(factory));
 			}
 		}
 		return advisors;
 	}
+
 
 	/**
 	 * Return whether the aspect bean with the given name is eligible.

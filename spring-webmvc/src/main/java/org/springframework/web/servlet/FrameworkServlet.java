@@ -322,6 +322,7 @@ public abstract class FrameworkServlet extends HttpServletBean implements Applic
 	}
 
 	protected WebApplicationContext createWebApplicationContext(@Nullable ApplicationContext parent) {
+		// XmlWebApplicationContext
 		Class<?> contextClass = getContextClass();
 		if (!ConfigurableWebApplicationContext.class.isAssignableFrom(contextClass)) {
 			throw new ApplicationContextException(

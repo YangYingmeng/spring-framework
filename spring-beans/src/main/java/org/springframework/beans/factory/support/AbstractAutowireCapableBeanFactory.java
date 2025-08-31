@@ -400,12 +400,11 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 	protected Object createBean(String beanName, RootBeanDefinition mbd, @Nullable Object[] args)
 			throws BeanCreationException {
 
-		// 如果日志级别为 trace，打印创建 Bean 的日志
 		if (logger.isTraceEnabled()) {
 			logger.trace("Creating instance of bean '" + beanName + "'");
 		}
 
-		// 默认使用传入的 BeanDefinition
+		// ----------------- 1. 准备 BeanDefinition -----------------
 		RootBeanDefinition mbdToUse = mbd;
 
 		// 判断需要创建的Bean 是否可以实例化,即是否可以通过当前的类加载器加载
@@ -416,6 +415,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 			mbdToUse.setBeanClass(resolvedClass);
 		}
 
+		// ----------------- 2. 处理 method overrides -----------------
 		try {
 			// 校验和准备 method overrides（用于 method-lookup、replace-method）
 			mbdToUse.prepareMethodOverrides();
@@ -424,8 +424,9 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 					beanName, "Validation of method overrides failed", ex);
 		}
 
+		// ----------------- 3. InstantiationAwareBeanPostProcessor 扩展点 并非 BeanPostProcessor -----------------
 		try {
-			// 【扩展点1】：尝试让 InstantiationAwareBeanPostProcessor 提前返回一个代理对象（如 @Configuration CGLIB）
+			// 尝试让 InstantiationAwareBeanPostProcessor 提前返回一个代理对象（如 @Configuration CGLIB）
 			// 如果 Bean 配置了初始化前和初始化后的处理器,则试图返回一个需要创建 Bean的代理对象
 			Object bean = resolveBeforeInstantiation(beanName, mbdToUse);
 			if (bean != null) {
@@ -436,12 +437,15 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 					"BeanPostProcessor before instantiation of bean failed", ex);
 		}
 
+		// ----------------- 4. 核心创建流程 -----------------
 		try {
 			// 【核心方法】：执行真正的创建流程，包括实例化、填充、初始化等
 			Object beanInstance = doCreateBean(beanName, mbdToUse, args);
 			if (logger.isTraceEnabled()) {
 				logger.trace("Finished creating instance of bean '" + beanName + "'");
 			}
+
+			// ----------------- 5. 返回最终 Bean 实例 -----------------
 			return beanInstance;
 		} catch (BeanCreationException | ImplicitlyAppearedSingletonException ex) {
 			throw ex;
@@ -475,11 +479,13 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 			throws BeanCreationException {
 
 		BeanWrapper instanceWrapper = null;
-		// 如果是单例，尝试从缓存中移除并获取 BeanWrapper（通常是工厂方法创建的缓存）
+
+		// ----------------- 1. 尝试从缓存获取 BeanWrapper -----------------
 		if (mbd.isSingleton()) {
 			instanceWrapper = this.factoryBeanInstanceCache.remove(beanName);
 		}
-		// 如果缓存不存在，则新创建 Bean 实例（调用构造方法实例化）
+
+		// ----------------- 2. 如果缓存不存在，创建 Bean 实例（调用构造方法实例化） -----------------
 		if (instanceWrapper == null) {
 			instanceWrapper = createBeanInstance(beanName, mbd, args);
 		}

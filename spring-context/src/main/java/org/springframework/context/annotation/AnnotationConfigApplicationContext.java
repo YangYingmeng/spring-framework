@@ -51,7 +51,6 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 		this.reader = new AnnotatedBeanDefinitionReader(this);
 		this.scanner = new ClassPathBeanDefinitionScanner(this);
 	}
-
 	/**
 	 * /最常用的构造函, 根据指定的类注册为 Bean（通常是 @Configuration/@Component 注解类），并自动 refresh。
 	 */

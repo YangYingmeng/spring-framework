@@ -733,16 +733,25 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			logger.trace("Pre-instantiating singletons in " + this);
 		}
 
+		// 1. 遍历所有 BeanDefinition
 		List<String> beanNames = new ArrayList<>(this.beanDefinitionNames);
 
 		for (String beanName : beanNames) {
 			RootBeanDefinition bd = getMergedLocalBeanDefinition(beanName);
+
+			// 2. 处理非抽象、单例、非延迟加载的 Bean(这三类是可以提前实例化或者可以实例化的Bean)
 			if (!bd.isAbstract() && bd.isSingleton() && !bd.isLazyInit()) {
+
+				// 2.1 对 FactoryBean 进行特殊处理，若支持 eagerInit 则实例化其产品
+				// 工厂Bean是用来获取其它对象的Bean, getBean("myFactoryBean") 返回的是 工厂生成的对象；
+				// 如果想拿 FactoryBean 本身，需要加前缀 & → getBean("&myFactoryBean")。
+				// 也就是说getBean("FactoryBeanName")时会触发工厂本身的getBean方法从而返回工厂里的对象
 				if (isFactoryBean(beanName)) {
 					Object bean = getBean(FACTORY_BEAN_PREFIX + beanName);
 					if (bean instanceof FactoryBean) {
 						FactoryBean<?> factory = (FactoryBean<?>) bean;
 						boolean isEagerInit;
+						// 只有实现了 SmartFactoryBean 的工厂对象才会提前初始化, 普通工厂对象不会提前初始化
 						if (System.getSecurityManager() != null && factory instanceof SmartFactoryBean) {
 							isEagerInit = AccessController.doPrivileged(
 									(PrivilegedAction<Boolean>) ((SmartFactoryBean<?>) factory)::isEagerInit,
@@ -758,11 +767,13 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 					}
 				}
 				else {
+					// 2.2 普通单例 Bean 直接实例化
 					getBean(beanName);
 				}
 			}
 		}
 
+		// 3. 遍历已实例化的单例 Bean，调用 SmartInitializingSingleton 的回调, 回调机制
 		for (String beanName : beanNames) {
 			Object singletonInstance = getSingleton(beanName);
 			if (singletonInstance instanceof SmartInitializingSingleton) {

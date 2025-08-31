@@ -64,16 +64,35 @@ public class BeanFactoryAdvisorRetrievalHelper {
 	 * @return the list of {@link org.springframework.aop.Advisor} beans
 	 * @see #isEligibleBean
 	 */
+	/**
+	 * findAdvisorBeans: 获取容器中所有可用的 Advisor Bean
+	 *
+	 * 流程：
+	 * 1️⃣ 检查缓存
+	 *      └─ 如果已缓存 Advisor 名称列表，则直接使用
+	 *      └─ 否则通过 BeanFactoryUtils 查询容器及祖先容器中所有类型为 Advisor 的 Bean 名称（不初始化 FactoryBean）
+	 *
+	 * 2️⃣ 遍历所有 Advisor Bean 名称
+	 *      ├─ 调用 isEligibleBean(name) 判断该 Advisor 是否符合条件（子类可重写）
+	 *      ├─ 检查 Advisor 是否正在创建中（循环依赖保护），若正在创建则跳过
+	 *      └─ 通过 beanFactory.getBean(name, Advisor.class) 获取实例
+	 *           └─ 如果获取过程中抛出 BeanCurrentlyInCreationException 且依赖于当前正在创建的 Bean，则跳过
+	 *
+	 * 3️⃣ 将符合条件的 Advisor 加入返回列表
+	 *
+	 * @return 当前容器中可应用的 Advisor 列表
+	 */
 	public List<Advisor> findAdvisorBeans() {
-		// Determine list of advisor bean names, if not cached already.
+		// 获取缓存的 Advisor Bean 名称
 		String[] advisorNames = this.cachedAdvisorBeanNames;
 		if (advisorNames == null) {
-			// Do not initialize FactoryBeans here: We need to leave all regular beans
-			// uninitialized to let the auto-proxy creator apply to them!
+			// 查询容器及祖先容器中所有 Advisor 类型的 Bean 名称
+			// 不初始化 FactoryBean，避免提前初始化普通 Bean
 			advisorNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
 					this.beanFactory, Advisor.class, true, false);
 			this.cachedAdvisorBeanNames = advisorNames;
 		}
+
 		if (advisorNames.length == 0) {
 			return new ArrayList<>();
 		}
@@ -81,6 +100,7 @@ public class BeanFactoryAdvisorRetrievalHelper {
 		List<Advisor> advisors = new ArrayList<>();
 		for (String name : advisorNames) {
 			if (isEligibleBean(name)) {
+				// 跳过正在创建的 Advisor（防止循环依赖）
 				if (this.beanFactory.isCurrentlyInCreation(name)) {
 					if (logger.isTraceEnabled()) {
 						logger.trace("Skipping currently created advisor '" + name + "'");
@@ -88,9 +108,11 @@ public class BeanFactoryAdvisorRetrievalHelper {
 				}
 				else {
 					try {
+						// 获取 Advisor 实例
 						advisors.add(this.beanFactory.getBean(name, Advisor.class));
 					}
 					catch (BeanCreationException ex) {
+						// 处理依赖当前正在创建 Bean 的情况
 						Throwable rootCause = ex.getMostSpecificCause();
 						if (rootCause instanceof BeanCurrentlyInCreationException) {
 							BeanCreationException bce = (BeanCreationException) rootCause;
@@ -100,8 +122,7 @@ public class BeanFactoryAdvisorRetrievalHelper {
 									logger.trace("Skipping advisor '" + name +
 											"' with dependency on currently created bean: " + ex.getMessage());
 								}
-								// Ignore: indicates a reference back to the bean we're trying to advise.
-								// We want to find advisors other than the currently created bean itself.
+								// 忽略：表示该 Advisor 依赖于当前正在创建的 Bean
 								continue;
 							}
 						}
